@@ -78,7 +78,8 @@ EVT_WDF_DRIVER_DEVICE_ADD SurfaceTouchPanelAlignmentEvtDeviceAdd;
 
 #define SURFACE_FIRMWARE_PROVISIONING_DATA L"sfpd"
 
-#define HEAT_VENDOR_SPECIFIC L"Heat\\VendorSpecific"
+#define REGISTRY_PARAMETER_HEAT L"Heat"
+#define REGISTRY_PARAMETER_VENDOR_SPECIFIC L"VendorSpecific"
 #define HEAT_LEFT_SHIFT L"PixelShiftForLeftPanelInMicrometer"
 #define HEAT_RIGHT_SHIFT L"PixelShiftForRightPanelInMicrometer"
 

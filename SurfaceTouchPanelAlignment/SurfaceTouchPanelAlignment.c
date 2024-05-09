@@ -172,6 +172,7 @@ NTSTATUS WriteHeatVendorParameters(WDFDEVICE device, PSFPD_DISPLAY_PIXEL_ALIGNME
 {
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
 	WDFKEY WdfKey = NULL;
+	WDFKEY WdfHeatKey = NULL;
 	WDFKEY WdfVendorSpecificKey = NULL;
 
 	if (PixelAlignmentData == NULL)
@@ -180,7 +181,8 @@ NTSTATUS WriteHeatVendorParameters(WDFDEVICE device, PSFPD_DISPLAY_PIXEL_ALIGNME
 		goto exit;
 	}
 
-	status = WdfDeviceOpenRegistryKey(device,
+	status = WdfDeviceOpenRegistryKey(
+		device,
 		PLUGPLAY_REGKEY_DEVICE,
 		STANDARD_RIGHTS_ALL,
 		WDF_NO_OBJECT_ATTRIBUTES,
@@ -191,10 +193,20 @@ NTSTATUS WriteHeatVendorParameters(WDFDEVICE device, PSFPD_DISPLAY_PIXEL_ALIGNME
 		goto exit;
 	}
 
-	UNICODE_STRING HeatVendorSpecificUnicode;
-	RtlInitUnicodeString(&HeatVendorSpecificUnicode, HEAT_VENDOR_SPECIFIC);
+	UNICODE_STRING HeatUnicode;
+	RtlInitUnicodeString(&HeatUnicode, REGISTRY_PARAMETER_HEAT);
 
-	status = WdfRegistryOpenKey(WdfKey, &HeatVendorSpecificUnicode, GENERIC_WRITE, WDF_NO_OBJECT_ATTRIBUTES, &WdfVendorSpecificKey);
+	status = WdfRegistryCreateKey(WdfKey, &HeatUnicode, KEY_ALL_ACCESS, REG_OPTION_NON_VOLATILE, NULL, WDF_NO_OBJECT_ATTRIBUTES, &WdfHeatKey);
+
+	if (!NT_SUCCESS(status))
+	{
+		goto exit;
+	}
+
+	UNICODE_STRING VendorSpecificUnicode;
+	RtlInitUnicodeString(&VendorSpecificUnicode, REGISTRY_PARAMETER_VENDOR_SPECIFIC);
+
+	status = WdfRegistryCreateKey(WdfHeatKey, &VendorSpecificUnicode, KEY_ALL_ACCESS, REG_OPTION_NON_VOLATILE, NULL, WDF_NO_OBJECT_ATTRIBUTES, &WdfVendorSpecificKey);
 
 	if (!NT_SUCCESS(status))
 	{
@@ -246,6 +258,11 @@ exit:
 	if (WdfVendorSpecificKey != NULL)
 	{
 		WdfRegistryClose(WdfVendorSpecificKey);
+	}
+
+	if (WdfHeatKey != NULL)
+	{
+		WdfRegistryClose(WdfHeatKey);
 	}
 
 	if (WdfKey != NULL)
@@ -486,10 +503,10 @@ NTSTATUS GetSFPDVolumePath(WDFDEVICE device, WCHAR* VolumePath, DWORD VolumePath
 		WDF_IO_TARGET_OPEN_PARAMS_INIT_OPEN_BY_NAME(
 			&IOTargetOpenParams,
 			&DevicePathUnicode,
-			GENERIC_READ
+			GENERIC_READ | GENERIC_WRITE
 		);
 
-		IOTargetOpenParams.ShareAccess = FILE_SHARE_READ;
+		IOTargetOpenParams.ShareAccess = FILE_SHARE_READ | FILE_SHARE_WRITE;
 
 		for (DWORD OpenAttemptCounter = 0; OpenAttemptCounter < MAX_FILE_OPEN_ATTEMPTS; OpenAttemptCounter++)
 		{
@@ -515,6 +532,8 @@ NTSTATUS GetSFPDVolumePath(WDFDEVICE device, WCHAR* VolumePath, DWORD VolumePath
 			goto exit;
 		}
 
+		DWORD PartitionCount = 4;
+
 		do
 		{
 			WDF_OBJECT_ATTRIBUTES_INIT(&Attributes);
@@ -526,7 +545,6 @@ NTSTATUS GetSFPDVolumePath(WDFDEVICE device, WCHAR* VolumePath, DWORD VolumePath
 				goto exit;
 			}
 
-			DWORD PartitionCount = 4;
 			DWORD IOCTLRequestMemoryBufferSize = sizeof(DRIVE_LAYOUT_INFORMATION_EX) + (PartitionCount * sizeof(PARTITION_INFORMATION_EX));
 
 			WDF_OBJECT_ATTRIBUTES_INIT(&Attributes);
@@ -576,7 +594,7 @@ NTSTATUS GetSFPDVolumePath(WDFDEVICE device, WCHAR* VolumePath, DWORD VolumePath
 
 			status = WdfRequestGetStatus(Request);
 
-			if ((status == STATUS_BUFFER_TOO_SMALL) || (status == STATUS_INSUFFICIENT_RESOURCES))
+			if (((status == STATUS_BUFFER_TOO_SMALL) || (status == STATUS_INSUFFICIENT_RESOURCES)) && PartitionCount < 256)
 			{
 				PartitionCount *= 2;
 
