@@ -213,8 +213,8 @@ NTSTATUS WriteHeatVendorParameters(WDFDEVICE device, PSFPD_DISPLAY_PIXEL_ALIGNME
 		goto exit;
 	}
 
-	DWORD LeftShift = 0;
-	DWORD RightShift = 0;
+	BYTE* LeftShift = NULL;
+	BYTE* RightShift = NULL;
 
 	if (PixelAlignmentData->Panel0Side == LEFT_SIDE)
 	{
@@ -234,24 +234,30 @@ NTSTATUS WriteHeatVendorParameters(WDFDEVICE device, PSFPD_DISPLAY_PIXEL_ALIGNME
 		RightShift = PixelAlignmentData->Panel1Shift;
 	}
 
-	UNICODE_STRING HeatLeftShiftUnicode;
-	RtlInitUnicodeString(&HeatLeftShiftUnicode, HEAT_LEFT_SHIFT);
-
-	status = WdfRegistryAssignULong(WdfVendorSpecificKey, &HeatLeftShiftUnicode, LeftShift);
-
-	if (!NT_SUCCESS(status))
+	if (LeftShift != NULL)
 	{
-		goto exit;
+		UNICODE_STRING HeatLeftShiftUnicode;
+		RtlInitUnicodeString(&HeatLeftShiftUnicode, HEAT_LEFT_SHIFT);
+
+		status = WdfRegistryAssignValue(WdfVendorSpecificKey, &HeatLeftShiftUnicode, REG_BINARY, 4, LeftShift);
+
+		if (!NT_SUCCESS(status))
+		{
+			goto exit;
+		}
 	}
 
-	UNICODE_STRING HeatRightShiftUnicode;
-	RtlInitUnicodeString(&HeatRightShiftUnicode, HEAT_RIGHT_SHIFT);
-
-	status = WdfRegistryAssignULong(WdfVendorSpecificKey, &HeatRightShiftUnicode, RightShift);
-
-	if (!NT_SUCCESS(status))
+	if (RightShift != NULL)
 	{
-		goto exit;
+		UNICODE_STRING HeatRightShiftUnicode;
+		RtlInitUnicodeString(&HeatRightShiftUnicode, HEAT_RIGHT_SHIFT);
+
+		status = WdfRegistryAssignValue(WdfVendorSpecificKey, &HeatRightShiftUnicode, REG_BINARY, 4, RightShift);
+
+		if (!NT_SUCCESS(status))
+		{
+			goto exit;
+		}
 	}
 
 exit:
@@ -286,7 +292,7 @@ NTSTATUS GetSFPDPixelAlignmentData(WDFDEVICE device, PSFPD_DISPLAY_PIXEL_ALIGNME
 	DWORD PixelAlignmentDataSize = sizeof(SFPD_DISPLAY_PIXEL_ALIGNMENT_DATA);
 	DWORD ActualSFPDFileSize = 0;
 
-	status = GetSFPDItemSize(device, L"\\display\\PixelAlignmentData.bin", &ActualSFPDFileSize);
+	status = GetSFPDItemSize(device, PIXEL_ALIGNMENT_DATA_FILE_PATH, &ActualSFPDFileSize);
 
 	if (!NT_SUCCESS(status))
 	{
@@ -299,7 +305,7 @@ NTSTATUS GetSFPDPixelAlignmentData(WDFDEVICE device, PSFPD_DISPLAY_PIXEL_ALIGNME
 		goto exit;
 	}
 
-	status = GetSFPDItem(device, L"\\display\\PixelAlignmentData.bin", PixelAlignmentData, PixelAlignmentDataSize);
+	status = GetSFPDItem(device, PIXEL_ALIGNMENT_DATA_FILE_PATH, PixelAlignmentData, PixelAlignmentDataSize);
 
 	if (!NT_SUCCESS(status))
 	{
